@@ -52,11 +52,10 @@ export default defineConfig(({ command, mode }) => {
         "react/jsx-runtime",
         "react/jsx-dev-runtime",
       ],
-      ignoreOutdatedRequests: true,
     },
     plugins,
     server: {
-      host: "::",
+      host: "0.0.0.0",
       port: 8080,
     },
   };
