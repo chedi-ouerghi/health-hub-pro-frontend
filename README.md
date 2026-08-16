@@ -1,3 +1,90 @@
+# Client — Health Hub Pro (React + Vite)
+
+Ce README documente entièrement le client React : installation, structure, conventions, composants clés, tests et dépannage. Rédigé en français pour les contributeurs du projet.
+
+1) Aperçu rapide
+- Stack : Vite + React + TypeScript, TanStack Router, React Query, Zustand, Tailwind/shadcn.
+- Contrat API : le client appelle l'API backend (préfixe `/api/v1`) ; la variable d'environnement attendue est `VITE_API_URL` (voir `client/.env.example`).
+
+2) Prérequis
+- Node.js >= 18 (recommandé 20)
+- Yarn / npm / bun (le projet contient des scripts pour npm et bun)
+- PostgreSQL + Redis pour le backend (si vous exécutez l'ensemble localement)
+
+3) Installation locale
+```bash
+git clone <repo>
+cd client
+npm install
+cp .env.example .env
+# modifier VITE_API_URL vers votre backend local, ex: http://localhost:5000/api/v1
+```
+
+4) Commandes utiles
+- Développement : `npm run dev`
+- Build production : `npm run build`
+- Preview build : `npm run preview`
+- Tests : `npm run test` (vitest)
+- Lint : `npm run lint` (si présent)
+
+5) Variables d'environnement
+- `VITE_API_URL` — URL complète de l'API backend (ex: `http://localhost:5000/api/v1`).
+- D'autres variables peuvent être présentes dans `client/.env.example` ou dans le portail Vite.
+
+6) Structure du code (points d'entrée)
+- `src/routes/` — pages et routing (TanStack Router). Chaque fichier sous `routes` correspond à une route.
+- `src/components/` — composants UI réutilisables et pages partielles.
+  - `components/booking/booking-panel.tsx` : interface de réservation (sélection date/créneau, saisie carte, confirmation).
+- `src/hooks/api/` — hooks React Query (ex: `use-appointments.ts`) utilisés par les pages.
+- `src/services/` — wrappers HTTP pour l'API (ex: `appointments.service.ts`).
+- `src/stores/` — état global (auth, ui), basé sur Zustand.
+- `src/types/` — types partagés et DTO côté client (garder synchronisé avec le backend).
+
+7) Flux réservation — résumé technique
+1. L'utilisateur sélectionne un médecin et un créneau via `find-doctor`.
+2. `BookingPanel` construit le payload `CreateAppointmentDto` puis appelle `appointmentsService.create()`.
+3. Le client fournit les champs de paiement (simulés en dev) : `cardNumber` (string), `expMonth` (number), `expYear` (number), `cvc` (string), `cardHolderName` (optionnel).
+4. Le backend traite la demande, simule le paiement et retourne l'objet `Appointment` (avec `invoice` si payé).
+
+8) Composants & fichiers clés à connaître
+- `client/src/components/booking/booking-panel.tsx` — UX de réservation, validation des cartes, indicateurs d'étapes.
+- `client/src/hooks/api/use-appointments.ts` — hooks pour mutation/query d'appointments.
+- `client/src/services/appointments.service.ts` — wrapper HTTP, point central pour adapter le format de payload.
+- `client/src/types/appointment.types.ts` — types DTO : mettez à jour si le backend évolue.
+
+9) Tests
+- Unit tests : `npm run test`. Les tests sont configurés avec `vitest` (voir `vitest.config.ts`).
+- Rendre les hooks testables en mockant `appointments.service` ou en utilisant `msw` pour simuler l'API.
+
+10) Lint / Format
+- Utilisez `npm run lint` et `npm run format` (si présents). Respectez les règles ESLint/Prettier du projet.
+
+11) Debug & dépannage
+- Erreur `Payment failed: Invalid card number` : utiliser une carte test Luhn valide `4242424242424242` et s'assurer que `expMonth` / `expYear` sont envoyés comme `number`.
+- Si le client ne trouve pas l'API : vérifier `VITE_API_URL` et que le backend est démarré.
+- Console SSR / Vite : regarder `client/.output/server` pour traces côté serveur (rendering).
+
+12) Ajouter une nouvelle page / route
+1. Créer `src/routes/<your>.tsx` suivant la convention TanStack Start.
+2. Ajouter l'export `Route` si nécessaire et reconstruire le routeTree (`routeTree.gen.ts` est généré).
+3. Ajouter tests pour la nouvelle page et les hooks associés.
+
+13) Conventions et bonnes pratiques
+- Types : centraliser DTOs dans `src/types` et garder la parité avec backend DTOs.
+- Hooks : mutations/queries dans `src/hooks/api`, une seule responsabilité par hook.
+- UI : composants purs dans `src/components/ui`, logique métier dans `src/components/booking` ou `routes`.
+
+14) Contribution
+- Fork & PR : créer des branches descriptives `feat/...` / `fix/...`.
+- Avant PR : lancer `npm run lint`, `npm run test`, vérifier build.
+
+15) Ressources supplémentaires
+- Endpoint API & Swagger : démarrer backend et ouvrir `/api-docs`.
+- Pour l'intégration paiement en prod : prévoir un provider (Stripe, Adyen) et extraire la logique de paiement hors du backend de dev.
+
+Contact
+- Besoin d'aide sur une intégration frontend/backend ou tests ? Ouvrez une issue avec reproduction et logs.
+
 # 🏥 Health Hub Pro — MediCare
 
 Plateforme médicale de prise de rendez-vous **en présentiel**, avec

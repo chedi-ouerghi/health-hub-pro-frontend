@@ -54,6 +54,11 @@ export interface CreateAppointmentDto {
   doctorId: string;
   scheduledAt: string;
   notes?: string;
+  cardNumber: string;
+  expMonth: number;
+  expYear: number;
+  cvc: string;
+  cardHolderName?: string;
 }
 
 export interface UpdateAppointmentStatusDto {
