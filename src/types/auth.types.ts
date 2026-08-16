@@ -12,6 +12,8 @@ export interface User {
   role: UserRole;
   status: UserStatus;
   emailVerifiedAt?: string | null;
+  twoFactorEnabled?: boolean;
+  phoneVerifiedAt?: string | null;
   lastLoginAt?: string | null;
   createdAt: string;
   updatedAt?: string;

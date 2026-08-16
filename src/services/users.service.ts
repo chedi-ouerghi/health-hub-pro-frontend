@@ -1,9 +1,18 @@
 import { apiClient, unwrap } from "../lib/api/client";
 import { UserSchema } from "../lib/api/validators";
-import type { ApiResponse } from "../types/api.types";
+import type { ApiResponse, PaginatedResponse, PaginationMeta } from "../types/api.types";
 import type { User } from "../types/auth.types";
 import type { Doctor, UpdateDoctorProfileDto } from "../types/doctor.types";
 import type { Patient, UpdatePatientProfileDto } from "../types/patient.types";
+import type {
+  UserSession,
+  ChangePasswordDto,
+  RequestPhoneVerificationDto,
+  RequestPhoneVerificationResponse,
+  ConfirmPhoneVerificationDto,
+  EnableTwoFactorResponse,
+  TwoFactorCodeDto,
+} from "../types/security.types";
 
 export const usersService = {
   getMe: async (): Promise<User> => {
@@ -17,6 +26,63 @@ export const usersService = {
     payload: UpdatePatientProfileDto | UpdateDoctorProfileDto,
   ): Promise<Patient | Doctor> => {
     const res = await apiClient.patch<ApiResponse<Patient | Doctor>>("/users/me", payload);
+    return unwrap(res);
+  },
+
+  // ── My sessions (connected devices) ────────────────────────────────────────
+
+  getMySessions: async (params?: { page?: number; limit?: number }): Promise<PaginatedResponse<UserSession>> => {
+    const res = await apiClient.get<ApiResponse<{ sessions: UserSession[]; meta: PaginationMeta }>>(
+      "/users/me/sessions",
+      { params },
+    );
+    const result = unwrap(res);
+    return { data: result.sessions, meta: result.meta };
+  },
+
+  revokeMySession: async (sessionId: string): Promise<{ message: string }> => {
+    const res = await apiClient.delete<ApiResponse<{ message: string }>>(
+      `/users/me/sessions/${sessionId}`,
+    );
+    return unwrap(res);
+  },
+
+  // ── Password ───────────────────────────────────────────────────────────────
+
+  changePassword: async (payload: ChangePasswordDto): Promise<{ message: string }> => {
+    const res = await apiClient.patch<ApiResponse<{ message: string }>>("/users/me/password", payload);
+    return unwrap(res);
+  },
+
+  // ── Two-factor authentication ──────────────────────────────────────────────
+
+  enableTwoFactor: async (payload?: TwoFactorCodeDto): Promise<EnableTwoFactorResponse> => {
+    const res = await apiClient.post<ApiResponse<EnableTwoFactorResponse>>("/users/me/2fa/enable", payload ?? {});
+    return unwrap(res);
+  },
+
+  disableTwoFactor: async (payload: TwoFactorCodeDto): Promise<{ message: string }> => {
+    const res = await apiClient.post<ApiResponse<{ message: string }>>("/users/me/2fa/disable", payload);
+    return unwrap(res);
+  },
+
+  // ── Phone verification ─────────────────────────────────────────────────────
+
+  requestPhoneVerification: async (
+    payload: RequestPhoneVerificationDto,
+  ): Promise<RequestPhoneVerificationResponse> => {
+    const res = await apiClient.post<ApiResponse<RequestPhoneVerificationResponse>>(
+      "/users/me/phone/verify",
+      payload,
+    );
+    return unwrap(res);
+  },
+
+  confirmPhoneVerification: async (payload: ConfirmPhoneVerificationDto): Promise<{ message: string }> => {
+    const res = await apiClient.post<ApiResponse<{ message: string }>>(
+      "/users/me/phone/verify/confirm",
+      payload,
+    );
     return unwrap(res);
   },
 };

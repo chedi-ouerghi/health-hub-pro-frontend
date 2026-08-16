@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,9 +8,6 @@ import { toast } from "sonner";
 import {
   BadgeCheck,
   Building2,
-  Laptop,
-  Lock,
-  Monitor,
   Moon,
   ShieldCheck,
   Stethoscope,
@@ -45,6 +42,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { SecurityPanel } from "@/components/settings/security-panel";
+import { ReferentialsManager } from "@/components/settings/referentials-manager";
+import { uploadService } from "@/services/upload.service";
+import { usersService } from "@/services/users.service";
+import { useAuthStore } from "@/stores/auth-store";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -76,12 +78,6 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const devices = [
-  { name: 'MacBook Pro 16"', location: "San Francisco, CA", last: "Active now", current: true },
-  { name: "iPhone 15 Pro", location: "San Francisco, CA", last: "2 hours ago", current: false },
-  { name: "iPad Air", location: "Oakland, CA", last: "5 days ago", current: false },
-];
-
 function SettingsPage() {
   const userQuery = useCurrentUserQuery();
   const role = userQuery.data?.role;
@@ -99,9 +95,10 @@ function PatientSettings() {
     reminders: true,
     marketing: false,
     research: false,
-    twoFactor: true,
     profileVisible: false,
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const userQuery = useCurrentUserQuery();
   const patient = userQuery.data?.patient;
@@ -158,6 +155,41 @@ function PatientSettings() {
     );
   };
 
+  const handleAvatarChange = async (file: File | undefined) => {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Unsupported file type", { description: "Use JPG, PNG or WebP." });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File too large", { description: "Images must be under 5 MB." });
+      return;
+    }
+    setUploading(true);
+    try {
+      const { url } = await uploadService.upload(file);
+      await new Promise<void>((resolve, reject) => {
+        updateProfile.mutate(
+          { photoUrl: url },
+          {
+            onSuccess: () => {
+              void userQuery.refetch();
+              resolve();
+            },
+            onError: reject,
+          },
+        );
+      });
+      toast.success("Profile picture updated");
+    } catch (err) {
+      toast.error("Upload failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const field = (name: keyof FormValues, label: string, type = "text") => (
     <div>
       <Label htmlFor={name} className="text-xs font-medium text-muted-foreground">
@@ -179,291 +211,190 @@ function PatientSettings() {
   );
 
   return (
-    <motion.form
-      variants={stagger}
-      initial="hidden"
-      animate="show"
-      onSubmit={form.handleSubmit(onSubmit, () => toast.error("Please fix the highlighted fields"))}
-      className="space-y-5"
-    >
-      <motion.div variants={fadeUp} className="flex items-end justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Account settings</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage your personal information, preferences and security.
-          </p>
+    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
+      <motion.form
+        variants={fadeUp}
+        onSubmit={form.handleSubmit(onSubmit, () => toast.error("Please fix the highlighted fields"))}
+        className="space-y-5"
+      >
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Account settings</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage your personal information, preferences and security.
+            </p>
+          </div>
+          <Button type="submit" disabled={updateProfile.isPending} className="h-11 rounded-2xl px-6">
+            {updateProfile.isPending ? "Saving…" : "Save changes"}
+          </Button>
         </div>
-        <Button type="submit" disabled={updateProfile.isPending} className="h-11 rounded-2xl px-6">
-          {updateProfile.isPending ? "Saving…" : "Save changes"}
-        </Button>
+
+        <div className="grid grid-cols-12 gap-5">
+          <section className="col-span-8 surface-card p-7">
+            <h3 className="text-base font-semibold">Personal information</h3>
+            <div className="mt-5 flex items-center gap-5">
+              {patient?.photoUrl ? (
+                <img
+                  src={patient.photoUrl}
+                  alt="Patient"
+                  width={512}
+                  height={512}
+                  className="size-20 rounded-3xl object-cover"
+                />
+              ) : (
+                <span className="grid size-20 place-items-center rounded-3xl bg-primary-soft text-2xl font-semibold text-primary">
+                  {patient?.firstName?.[0] ?? "P"}
+                </span>
+              )}
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleAvatarChange(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploading ? "Uploading…" : "Upload new photo"}
+                </Button>
+                <p className="mt-2 text-xs text-muted-foreground">JPG, PNG or WebP, up to 5MB.</p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-5">
+              {field("fullName", "Full name")}
+              {field("email", "Email address", "email")}
+              {field("phone", "Phone number")}
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground">Language</Label>
+                <Select
+                  value={form.watch("language")}
+                  onValueChange={(v) => form.setValue("language", v)}
+                >
+                  <SelectTrigger className="mt-2 h-11 w-full rounded-2xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["English (US)", "Français", "Español", "Deutsch"].map((l) => (
+                      <SelectItem key={l} value={l}>
+                        {l}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">{field("address", "Address")}</div>
+              {field("emergencyName", "Emergency contact name")}
+              {field("emergencyPhone", "Emergency contact phone")}
+            </div>
+          </section>
+
+          <aside className="col-span-4 space-y-5">
+            <div className="surface-card p-7">
+              <h3 className="text-base font-semibold">Appearance</h3>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {(
+                  [
+                    { key: "light", label: "Light", icon: Sun },
+                    { key: "dark", label: "Dark", icon: Moon },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setTheme(option.key)}
+                    aria-pressed={theme === option.key}
+                    className={cn(
+                      "rounded-2xl border p-4 transition-all",
+                      theme === option.key
+                        ? "border-primary/50 bg-primary-soft"
+                        : "border-border hover:border-primary/30",
+                    )}
+                  >
+                    <option.icon className="mx-auto size-4 text-primary" />
+                    <span className="mt-2 block text-xs font-medium">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="surface-card p-7">
+              <h3 className="text-base font-semibold">Notifications</h3>
+              <div className="mt-4 space-y-4">
+                {(
+                  [
+                    ["appointments", "Appointment updates"],
+                    ["reminders", "Medication reminders"],
+                    ["marketing", "Product news"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <Label htmlFor={key} className="text-sm">
+                      {label}
+                    </Label>
+                    <Switch
+                      id={key}
+                      checked={prefs[key]}
+                      onCheckedChange={(v) => setPrefs((p) => ({ ...p, [key]: v }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </motion.form>
+
+      <motion.div variants={fadeUp}>
+        <SecurityPanel />
       </motion.div>
 
-      <div className="grid grid-cols-12 gap-5">
-        <motion.section variants={fadeUp} className="col-span-8 surface-card p-7">
-          <h3 className="text-base font-semibold">Personal information</h3>
-          <div className="mt-5 flex items-center gap-5">
-            {patient?.photoUrl ? (
-              <img
-                src={patient.photoUrl}
-                alt="Patient"
-                width={512}
-                height={512}
-                className="size-20 rounded-3xl object-cover"
-              />
-            ) : (
-              <span className="grid size-20 place-items-center rounded-3xl bg-primary-soft text-2xl font-semibold text-primary">
-                {patient?.firstName?.[0] ?? "P"}
-              </span>
-            )}
-            <div>
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-2xl"
-                onClick={() => toast.success("Profile picture updated")}
-              >
-                Upload new photo
-              </Button>
-              <p className="mt-2 text-xs text-muted-foreground">JPG or PNG, up to 4MB.</p>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-5">
-            {field("fullName", "Full name")}
-            {field("email", "Email address", "email")}
-            {field("phone", "Phone number")}
-            <div>
-              <Label className="text-xs font-medium text-muted-foreground">Language</Label>
-              <Select
-                value={form.watch("language")}
-                onValueChange={(v) => form.setValue("language", v)}
-              >
-                <SelectTrigger className="mt-2 h-11 w-full rounded-2xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["English (US)", "Français", "Español", "Deutsch"].map((l) => (
-                    <SelectItem key={l} value={l}>
-                      {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-2">{field("address", "Address")}</div>
-            {field("emergencyName", "Emergency contact name")}
-            {field("emergencyPhone", "Emergency contact phone")}
-          </div>
-        </motion.section>
-
-        <motion.section variants={fadeUp} className="col-span-4 space-y-5">
-          <div className="surface-card p-7">
-            <h3 className="text-base font-semibold">Appearance</h3>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {(
-                [
-                  { key: "light", label: "Light", icon: Sun },
-                  { key: "dark", label: "Dark", icon: Moon },
-                ] as const
-              ).map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setTheme(option.key)}
-                  aria-pressed={theme === option.key}
-                  className={cn(
-                    "rounded-2xl border p-4 transition-all",
-                    theme === option.key
-                      ? "border-primary/50 bg-primary-soft"
-                      : "border-border hover:border-primary/30",
-                  )}
-                >
-                  <option.icon className="mx-auto size-4 text-primary" />
-                  <span className="mt-2 block text-xs font-medium">{option.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="surface-card p-7">
-            <h3 className="text-base font-semibold">Notifications</h3>
-            <div className="mt-4 space-y-4">
-              {(
-                [
-                  ["appointments", "Appointment updates"],
-                  ["reminders", "Medication reminders"],
-                  ["marketing", "Product news"],
-                ] as const
-              ).map(([key, label]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <Label htmlFor={key} className="text-sm">
-                    {label}
-                  </Label>
-                  <Switch
-                    id={key}
-                    checked={prefs[key]}
-                    onCheckedChange={(v) => setPrefs((p) => ({ ...p, [key]: v }))}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.section>
-
-        <motion.section variants={fadeUp} className="col-span-6 surface-card p-7">
-          <h3 className="flex items-center gap-2 text-base font-semibold">
-            <Lock className="size-4 text-primary" /> Password
-          </h3>
-          <div className="mt-5 space-y-4">
-            <div>
-              <Label className="text-xs font-medium text-muted-foreground">Current password</Label>
-              <Input type="password" defaultValue="••••••••••" className="mt-2 h-11 rounded-2xl" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground">New password</Label>
-                <Input type="password" className="mt-2 h-11 rounded-2xl" />
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground">
-                  Confirm password
-                </Label>
-                <Input type="password" className="mt-2 h-11 rounded-2xl" />
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-2xl"
-              onClick={() => toast.success("Password updated")}
-            >
-              Update password
+      <motion.section
+        variants={fadeUp}
+        className="rounded-3xl border border-destructive/30 bg-destructive/5 p-7"
+      >
+        <h3 className="flex items-center gap-2 text-base font-semibold text-destructive">
+          <Trash2 className="size-4" /> Delete account
+        </h3>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          Permanently remove your account, medical records and appointment history. This action
+          cannot be undone.
+        </p>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button type="button" variant="destructive" className="mt-5 rounded-2xl">
+              Delete my account
             </Button>
-          </div>
-        </motion.section>
-
-        <motion.section variants={fadeUp} className="col-span-6 surface-card p-7">
-          <h3 className="flex items-center gap-2 text-base font-semibold">
-            <ShieldCheck className="size-4 text-primary" /> Privacy & security
-          </h3>
-          <div className="mt-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="twoFactor" className="text-sm">
-                  Two-factor authentication
-                </Label>
-                <p className="text-xs text-muted-foreground">Extra security on every sign-in.</p>
-              </div>
-              <Switch
-                id="twoFactor"
-                checked={prefs.twoFactor}
-                onCheckedChange={(v) => setPrefs((p) => ({ ...p, twoFactor: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="profileVisible" className="text-sm">
-                  Public profile
-                </Label>
-                <p className="text-xs text-muted-foreground">Let doctors find your care history.</p>
-              </div>
-              <Switch
-                id="profileVisible"
-                checked={prefs.profileVisible}
-                onCheckedChange={(v) => setPrefs((p) => ({ ...p, profileVisible: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="research" className="text-sm">
-                  Share anonymised data
-                </Label>
-                <p className="text-xs text-muted-foreground">Helps improve medical research.</p>
-              </div>
-              <Switch
-                id="research"
-                checked={prefs.research}
-                onCheckedChange={(v) => setPrefs((p) => ({ ...p, research: v }))}
-              />
-            </div>
-          </div>
-        </motion.section>
-
-        <motion.section variants={fadeUp} className="col-span-8 surface-card p-7">
-          <h3 className="text-base font-semibold">Connected devices</h3>
-          <ul className="mt-4 divide-y divide-border">
-            {devices.map((device) => (
-              <li key={device.name} className="flex items-center gap-4 py-4">
-                <span className="grid size-10 place-items-center rounded-2xl bg-primary-soft">
-                  {device.name.includes("Mac") ? (
-                    <Laptop className="size-4 text-primary" />
-                  ) : (
-                    <Monitor className="size-4 text-primary" />
-                  )}
-                </span>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{device.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {device.location} · {device.last}
-                  </p>
-                </div>
-                {device.current ? (
-                  <span className="rounded-full bg-success/12 px-2.5 py-1 text-[10px] font-semibold text-success">
-                    This device
-                  </span>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 rounded-2xl"
-                    onClick={() => toast.success(`${device.name} signed out`)}
-                  >
-                    Sign out
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </motion.section>
-
-        <motion.section
-          variants={fadeUp}
-          className="col-span-4 rounded-3xl border border-destructive/30 bg-destructive/5 p-7"
-        >
-          <h3 className="flex items-center gap-2 text-base font-semibold text-destructive">
-            <Trash2 className="size-4" /> Delete account
-          </h3>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            Permanently remove your account, medical records and appointment history. This action
-            cannot be undone.
-          </p>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="destructive" className="mt-5 rounded-2xl">
-                Delete my account
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="rounded-3xl">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  All records, invoices and upcoming appointments will be permanently removed.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="rounded-2xl">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="rounded-2xl"
-                  onClick={() => toast.error("Account deletion requested")}
-                >
-                  Yes, delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </motion.section>
-      </div>
-    </motion.form>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="rounded-3xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+              <AlertDialogDescription>
+                All records, invoices and upcoming appointments will be permanently removed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-2xl">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="rounded-2xl"
+                onClick={() => toast.error("Account deletion requested")}
+              >
+                Yes, delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </motion.section>
+    </motion.div>
   );
 }
 
@@ -485,6 +416,43 @@ function DoctorSettings() {
   const userQuery = useCurrentUserQuery();
   const doctor = userQuery.data?.doctor;
   const updateDoctor = useUpdateDoctorProfileMutation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleAvatarChange = async (file: File | undefined) => {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Unsupported file type", { description: "Use JPG, PNG or WebP." });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File too large", { description: "Images must be under 5 MB." });
+      return;
+    }
+    setUploading(true);
+    try {
+      const { url } = await uploadService.upload(file);
+      await new Promise<void>((resolve, reject) => {
+        updateDoctor.mutate(
+          { photoUrl: url },
+          {
+            onSuccess: () => {
+              void userQuery.refetch();
+              resolve();
+            },
+            onError: reject,
+          },
+        );
+      });
+      toast.success("Profile picture updated");
+    } catch (err) {
+      toast.error("Upload failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const form = useForm<DoctorFormValues>({
     resolver: zodResolver(doctorSchema),
@@ -590,6 +558,39 @@ function DoctorSettings() {
           )}
 
           <div className="mt-6 grid grid-cols-2 gap-5">
+            <div className="col-span-2 flex items-center gap-4">
+              {doctor?.photoUrl && (
+                <img
+                  src={doctor.photoUrl}
+                  alt="Doctor"
+                  width={512}
+                  height={512}
+                  className="size-16 rounded-3xl object-cover"
+                />
+              )}
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleAvatarChange(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploading ? "Uploading…" : "Upload new photo"}
+                </Button>
+                <p className="mt-1.5 text-xs text-muted-foreground">JPG, PNG or WebP, up to 5MB.</p>
+              </div>
+            </div>
             {field("bio", "Bio")}
             {field("clinicName", "Clinic name")}
             <div className="col-span-2">{field("addressLine", "Clinic address")}</div>
@@ -706,6 +707,10 @@ function DoctorSettings() {
           </div>
         </motion.section>
       </div>
+
+      <motion.div variants={fadeUp}>
+        <SecurityPanel />
+      </motion.div>
     </motion.form>
   );
 }
@@ -721,7 +726,7 @@ function AdminSettings() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Account settings</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Admin functionality is intentionally limited in this version.
+            Manage your administrator profile, security and platform referentials.
           </p>
         </div>
       </motion.div>
@@ -771,6 +776,14 @@ function AdminSettings() {
           </div>
         </div>
       </motion.section>
+
+      <motion.div variants={fadeUp}>
+        <SecurityPanel />
+      </motion.div>
+
+      <motion.div variants={fadeUp}>
+        <ReferentialsManager />
+      </motion.div>
     </motion.div>
   );
 }

@@ -6,6 +6,7 @@ import type {
   CreateAppointmentDto,
   FilterAppointmentsDto,
   UpdateAppointmentStatusDto,
+  RescheduleAppointmentDto,
 } from "../../types/appointment.types";
 
 export function useAppointmentsQuery(filters?: FilterAppointmentsDto) {
@@ -72,6 +73,23 @@ export function useCancelAppointmentMutation() {
       if (cancelledAppt.id) {
         queryClient.invalidateQueries({
           queryKey: appointmentsKeys.detail(cancelledAppt.id),
+        });
+      }
+    },
+  });
+}
+
+export function useRescheduleAppointmentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: RescheduleAppointmentDto }) =>
+      appointmentsService.reschedule(id, payload),
+    onSuccess: (rescheduledAppt) => {
+      queryClient.invalidateQueries({ queryKey: appointmentsKeys.all });
+      if (rescheduledAppt.id) {
+        queryClient.invalidateQueries({
+          queryKey: appointmentsKeys.detail(rescheduledAppt.id),
         });
       }
     },

@@ -67,6 +67,7 @@ function HistoryPage() {
   );
   const userQuery = useCurrentUserQuery();
   const isDoctor = userQuery.data?.role === "DOCTOR";
+  const isAdmin = userQuery.data?.role === "ADMIN" || userQuery.data?.role === "SUPER_ADMIN";
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -162,7 +163,7 @@ function HistoryPage() {
                           : appointment.status === "CANCELLED"
                             ? "bg-destructive"
                             : appointment.status === "RESCHEDULED" ||
-                                appointment.status === "NO_SHOW"
+                              appointment.status === "NO_SHOW"
                               ? "bg-warning"
                               : "bg-primary",
                       )}
@@ -242,7 +243,7 @@ function HistoryPage() {
                       >
                         <Download className="size-4" /> Invoice
                       </Button>
-                      {doctor && !isDoctor && (
+                      {doctor && userQuery.data?.role === "PATIENT" && (
                         <Button
                           className="h-10 rounded-2xl"
                           onClick={() =>
@@ -284,32 +285,111 @@ function HistoryPage() {
           </DialogHeader>
           {details && (
             <>
-              <dl className="space-y-2.5 text-sm">
-                {(
-                  [
-                    [
-                      "Date",
-                      new Date(details.scheduledAt).toLocaleString("en-US", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }),
-                    ],
-                    ["Type", "In-clinic"],
-                    ["Status", details.status.toLowerCase()],
-                    ["Invoice", details.invoice?.invoiceNumber ?? "—"],
-                    ["Amount", `$${Number(details.price).toFixed(2)}`],
-                  ] as [string, string][]
-                ).map(([label, value]) => (
-                  <div key={label} className="flex justify-between">
-                    <dt className="text-muted-foreground">{label}</dt>
-                    <dd className="font-medium capitalize">{value}</dd>
+              {isAdmin ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      {details.patient?.photoUrl && (
+                        <img
+                          src={details.patient.photoUrl}
+                          alt=""
+                          loading="lazy"
+                          className="size-14 rounded-2xl object-cover"
+                        />
+                      )}
+                      <div>
+                        <p className="text-base font-semibold">
+                          {details.patient ? `${details.patient.firstName} ${details.patient.lastName}` : "Patient"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">Patient ID: {details.patient?.id ?? "—"}</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-card p-4">
+                      <p className="text-sm text-muted-foreground">Clinic</p>
+                      <p className="font-medium">{details.clinicAddressSnapshot}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <dt className="text-muted-foreground">Notes</dt>
+                      <dd className="rounded-2xl bg-muted/60 p-3 text-sm leading-relaxed text-muted-foreground">
+                        {details.notes ?? "—"}
+                      </dd>
+                    </div>
                   </div>
-                ))}
-              </dl>
-              {details.notes && (
-                <p className="rounded-2xl bg-muted/60 p-4 text-xs leading-relaxed text-muted-foreground">
-                  {details.notes}
-                </p>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Doctor</p>
+                        <p className="font-medium">
+                          {details.doctor ? `${details.doctor.firstName} ${details.doctor.lastName}` : "Doctor"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">Doctor ID: {details.doctor?.id ?? "—"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Amount</p>
+                        <p className="text-lg font-semibold">${Number(details.price).toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">{details.status.toLowerCase()}</p>
+                      </div>
+                    </div>
+
+                    <dl className="space-y-2.5 text-sm">
+                      {(
+                        [
+                          [
+                            "Scheduled",
+                            new Date(details.scheduledAt).toLocaleString("en-US", {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            }),
+                          ],
+                          ["Duration", `${details.durationMinutes} minutes`],
+                          ["Status", details.status.toLowerCase()],
+                          ["Invoice #", details.invoice?.invoiceNumber ?? "—"],
+                          ["Invoice status", details.invoice?.status ?? "—"],
+                          ["Invoice paid at", details.invoice?.paidAt ? new Date(details.invoice.paidAt).toLocaleString() : "—"],
+                          ["Created at", details.createdAt ? new Date(details.createdAt).toLocaleString() : "—"],
+                        ] as [string, string][]
+                      ).map(([label, value]) => (
+                        <div key={label} className="flex justify-between">
+                          <dt className="text-muted-foreground">{label}</dt>
+                          <dd className="font-medium capitalize text-right">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <dl className="space-y-2.5 text-sm">
+                    {(
+                      [
+                        [
+                          "Date",
+                          new Date(details.scheduledAt).toLocaleString("en-US", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          }),
+                        ],
+                        ["Type", "In-clinic"],
+                        ["Status", details.status.toLowerCase()],
+                        ["Invoice", details.invoice?.invoiceNumber ?? "—"],
+                        ["Amount", `$${Number(details.price).toFixed(2)}`],
+                      ] as [string, string][]
+                    ).map(([label, value]) => (
+                      <div key={label} className="flex justify-between">
+                        <dt className="text-muted-foreground">{label}</dt>
+                        <dd className="font-medium capitalize">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {details.notes && (
+                    <p className="rounded-2xl bg-muted/60 p-4 text-xs leading-relaxed text-muted-foreground">
+                      {details.notes}
+                    </p>
+                  )}
+                </>
               )}
             </>
           )}

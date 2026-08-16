@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import {
+  CalendarClock,
   CalendarPlus,
   CalendarX2,
   CheckCircle2,
@@ -16,11 +17,196 @@ import {
   useAppointmentsQuery,
   useCancelAppointmentMutation,
   useUpdateAppointmentStatusMutation,
+  useRescheduleAppointmentMutation,
 } from "@/hooks/api/use-appointments";
+import { useDoctorAvailabilitiesQuery } from "@/hooks/api/use-doctors";
 import { useCurrentUserQuery } from "@/hooks/api/use-auth";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Appointment } from "@/types/appointment.types";
+
+const TIME_SLOTS: string[] = [];
+for (let h = 8; h <= 20; h++) {
+  for (const m of ["00", "30"] as const) {
+    if (h === 20 && m === "30") continue;
+    TIME_SLOTS.push(`${String(h).padStart(2, "0")}:${m}`);
+  }
+}
+
+function RescheduleDialog({ appointment }: { appointment: Appointment }) {
+  const [date, setDate] = useState<Date | undefined>(() => {
+    const d = new Date(appointment.scheduledAt);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  });
+  const [time, setTime] = useState(() => {
+    const d = new Date(appointment.scheduledAt);
+    return Number.isNaN(d.getTime())
+      ? "09:00"
+      : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  });
+  const reschedule = useRescheduleAppointmentMutation();
+
+  const userQuery = useCurrentUserQuery();
+  const role = userQuery.data?.role ?? "PATIENT";
+
+  const doctorId = appointment.doctor?.id ?? (appointment as any).doctorId;
+  const availQuery = useDoctorAvailabilitiesQuery(doctorId || "");
+  const allAppointmentsQuery = useAppointmentsQuery();
+
+  const availableSlots = useMemo(() => {
+    if (!date || !availQuery.data) return [] as string[];
+
+    const DAY_MAP = [
+      "SUNDAY",
+      "MONDAY",
+      "TUESDAY",
+      "WEDNESDAY",
+      "THURSDAY",
+      "FRIDAY",
+      "SATURDAY",
+    ];
+    const dayName = DAY_MAP[date.getDay()];
+
+    const matching = availQuery.data.filter((a) => a.dayOfWeek === dayName && a.isActive !== false);
+    const slots: string[] = [];
+    for (const m of matching) {
+      const [sh, sm] = m.startTime.split(":").map(Number);
+      const [eh, em] = m.endTime.split(":").map(Number);
+      const slotMinutes = m.slotMinutes ?? 30;
+      let cur = sh * 60 + sm;
+      const end = eh * 60 + em;
+      while (cur + slotMinutes <= end) {
+        const h = Math.floor(cur / 60);
+        const mm = cur % 60;
+        const slot = `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+        // if date is today, don't include past times
+        const slotDate = new Date(date);
+        slotDate.setHours(h, mm, 0, 0);
+        if (slotDate.getTime() > Date.now()) {
+          slots.push(slot);
+        }
+        cur += slotMinutes;
+      }
+    }
+    return slots;
+  }, [date, availQuery.data]);
+
+  const bookedSet = useMemo(() => {
+    if (!date) return new Set<string>();
+    if (!(role === "DOCTOR" || role === "ADMIN")) return new Set<string>();
+
+    const appts = allAppointmentsQuery.data?.data ?? [];
+    const filtered = appts.filter((a) => {
+      if (role === "ADMIN" && a.doctor?.id !== doctorId) return false;
+      if (role === "DOCTOR") return true;
+      return a.doctor?.id === doctorId;
+    });
+    const set = new Set<string>();
+    for (const a of filtered) {
+      const d = new Date(a.scheduledAt);
+      if (d.toDateString() !== date.toDateString()) continue;
+      const slot = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      set.add(slot);
+    }
+    return set;
+  }, [date, allAppointmentsQuery.data, role, doctorId]);
+
+  const confirm = () => {
+    if (!date || !time) return;
+    const [h = 0, m = 0] = time.split(":").map(Number);
+    const scheduledAt = new Date(date);
+    scheduledAt.setHours(h, m, 0, 0);
+    if (scheduledAt.getTime() <= Date.now()) {
+      toast.error("Invalid date", { description: "Please pick a future date and time." });
+      return;
+    }
+    reschedule.mutate(
+      { id: appointment.id, payload: { scheduledAt: scheduledAt.toISOString() } },
+      {
+        onSuccess: () => toast.success("Appointment rescheduled"),
+        onError: (err) =>
+          toast.error("Could not reschedule", {
+            description: err instanceof Error ? err.message : "Please try again.",
+          }),
+      },
+    );
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" className="h-10 rounded-2xl">
+          <CalendarClock className="size-4" />
+          Reschedule
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="rounded-3xl sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Reschedule appointment</DialogTitle>
+          <DialogDescription>
+            Choose a new date and time for this consultation. Both you and the doctor will be
+            notified.
+          </DialogDescription>
+        </DialogHeader>
+        <Calendar
+          mode="single"
+          selected={date}
+          onSelect={setDate}
+          disabled={{ before: new Date() }}
+          className="mx-auto"
+        />
+        <div>
+          <Select value={time} onValueChange={setTime}>
+            <SelectTrigger className="h-11 w-full rounded-2xl">
+              <SelectValue placeholder="Time" />
+            </SelectTrigger>
+            <SelectContent>
+              {(availableSlots.length === 0 ? TIME_SLOTS : availableSlots).map((slot) => {
+                const booked = bookedSet.has(slot);
+                return (
+                  <SelectItem key={slot} value={slot}>
+                    <div className="flex items-center justify-between">
+                      <span>{slot}</span>
+                      {booked && (
+                        <span className="ml-3 text-xs text-muted-foreground/90">Doctor already has an appointment</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button
+            className="rounded-2xl"
+            onClick={confirm}
+            disabled={!date || reschedule.isPending}
+          >
+            {reschedule.isPending ? "Rescheduling…" : "Confirm new date"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const Route = createFileRoute("/_authenticated/appointments")({
   head: () => ({
@@ -117,6 +303,7 @@ function PatientAppointments() {
         </div>
         {appointment.status === "UPCOMING" && (
           <div className="mt-5 flex justify-end gap-2 border-t border-border pt-5">
+            <RescheduleDialog appointment={appointment} />
             <Button
               variant="outline"
               className="h-10 rounded-2xl border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
@@ -282,6 +469,7 @@ function AgendaView({ isAdmin }: { isAdmin: boolean }) {
             </Button>
             {appointment.status === "UPCOMING" && (
               <div className="flex flex-wrap justify-end gap-2">
+                <RescheduleDialog appointment={appointment} />
                 <Button
                   className="h-10 rounded-2xl"
                   disabled={busyThis}

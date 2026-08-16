@@ -4,10 +4,18 @@ export const authKeys = {
 
 export const usersKeys = {
   me: ["users", "me"] as const,
+  sessions: ["users", "me", "sessions"] as const,
 };
 
 export const specialtiesKeys = {
   all: ["specialties", "list"] as const,
+};
+
+export const referentialsKeys = {
+  all: ["admin", "referentials"] as const,
+  specialties: ["admin", "referentials", "specialties"] as const,
+  languages: ["admin", "referentials", "languages"] as const,
+  focusAreas: ["admin", "referentials", "focus-areas"] as const,
 };
 
 export const doctorsKeys = {

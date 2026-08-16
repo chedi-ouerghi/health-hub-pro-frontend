@@ -18,7 +18,7 @@ export const UserSchema = z.object({
   status: UserStatusSchema,
   emailVerifiedAt: z.string().nullable().optional(),
   lastLoginAt: z.string().nullable().optional(),
-  createdAt: z.string(),
+  createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
   patient: z.any().optional(),
   doctor: z.any().optional(),
@@ -52,5 +52,6 @@ export const AppointmentSchema = z.object({
   currency: z.string(),
   notes: z.string().nullable().optional(),
   cancelReason: z.string().nullable().optional(),
-  createdAt: z.string(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });

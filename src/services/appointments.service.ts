@@ -6,6 +6,7 @@ import type {
   CreateAppointmentDto,
   FilterAppointmentsDto,
   UpdateAppointmentStatusDto,
+  RescheduleAppointmentDto,
 } from "../types/appointment.types";
 
 export const appointmentsService = {
@@ -42,5 +43,15 @@ export const appointmentsService = {
   cancel: async (id: string): Promise<Appointment> => {
     const res = await apiClient.delete<ApiResponse<Appointment>>(`/appointments/${id}`);
     return unwrap(res);
+  },
+
+  reschedule: async (id: string, payload: RescheduleAppointmentDto): Promise<Appointment> => {
+    const res = await apiClient.patch<ApiResponse<Appointment>>(
+      `/appointments/${id}/reschedule`,
+      payload,
+    );
+    const data = unwrap(res);
+    AppointmentSchema.parse(data);
+    return data;
   },
 };

@@ -66,6 +66,10 @@ export interface UpdateAppointmentStatusDto {
   cancelReason?: string;
 }
 
+export interface RescheduleAppointmentDto {
+  scheduledAt: string;
+}
+
 export interface FilterAppointmentsDto {
   status?: AppointmentStatus;
   page?: number;
