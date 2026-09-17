@@ -5,13 +5,13 @@ import type { User } from "../types/auth.types";
 import type { Doctor, UpdateDoctorProfileDto } from "../types/doctor.types";
 import type { Patient, UpdatePatientProfileDto } from "../types/patient.types";
 import type {
-  UserSession,
-  ChangePasswordDto,
-  RequestPhoneVerificationDto,
-  RequestPhoneVerificationResponse,
-  ConfirmPhoneVerificationDto,
-  EnableTwoFactorResponse,
-  TwoFactorCodeDto,
+    ChangePasswordDto,
+    ConfirmEmailVerificationDto,
+    EnableTwoFactorResponse,
+    RequestEmailVerificationDto,
+    RequestEmailVerificationResponse,
+    TwoFactorCodeDto,
+    UserSession,
 } from "../types/security.types";
 
 export const usersService = {
@@ -66,21 +66,21 @@ export const usersService = {
     return unwrap(res);
   },
 
-  // ── Phone verification ─────────────────────────────────────────────────────
+  // ── Email verification ─────────────────────────────────────────────────────
 
-  requestPhoneVerification: async (
-    payload: RequestPhoneVerificationDto,
-  ): Promise<RequestPhoneVerificationResponse> => {
-    const res = await apiClient.post<ApiResponse<RequestPhoneVerificationResponse>>(
-      "/users/me/phone/verify",
+  requestEmailVerification: async (
+    payload: RequestEmailVerificationDto,
+  ): Promise<RequestEmailVerificationResponse> => {
+    const res = await apiClient.post<ApiResponse<RequestEmailVerificationResponse>>(
+      "/users/me/email/verify",
       payload,
     );
     return unwrap(res);
   },
 
-  confirmPhoneVerification: async (payload: ConfirmPhoneVerificationDto): Promise<{ message: string }> => {
+  confirmEmailVerification: async (payload: ConfirmEmailVerificationDto): Promise<{ message: string }> => {
     const res = await apiClient.post<ApiResponse<{ message: string }>>(
-      "/users/me/phone/verify/confirm",
+      "/users/me/email/verify/confirm",
       payload,
     );
     return unwrap(res);

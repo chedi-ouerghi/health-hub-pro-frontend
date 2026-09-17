@@ -48,17 +48,14 @@ export interface Appointment {
   patient?: AppointmentPatientSummary;
   invoice?: AppointmentInvoiceSummary | null;
   review?: AppointmentReviewSummary | null;
+  clientSecret?: string;
+  stripePublishableKey?: string;
 }
 
 export interface CreateAppointmentDto {
   doctorId: string;
   scheduledAt: string;
   notes?: string;
-  cardNumber: string;
-  expMonth: number;
-  expYear: number;
-  cvc: string;
-  cardHolderName?: string;
 }
 
 export interface UpdateAppointmentStatusDto {

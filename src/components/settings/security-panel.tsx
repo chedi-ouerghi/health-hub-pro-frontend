@@ -1,29 +1,29 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { toast } from "sonner";
-import { BadgeCheck, KeyRound, Laptop, Monitor, PhoneCall, QrCode, ShieldCheck, Smartphone, Tablet } from "lucide-react";
-import { useCurrentUserQuery } from "@/hooks/api/use-auth";
-import {
-  useMySessionsQuery,
-  useRevokeMySessionMutation,
-  useChangePasswordMutation,
-  useEnableTwoFactorMutation,
-  useDisableTwoFactorMutation,
-  useRequestPhoneVerificationMutation,
-  useConfirmPhoneVerificationMutation,
-} from "@/hooks/api/use-users";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
+    InputOTP,
+    InputOTPGroup,
+    InputOTPSeparator,
+    InputOTPSlot,
 } from "@/components/ui/input-otp";
+import { Label } from "@/components/ui/label";
+import { useCurrentUserQuery } from "@/hooks/api/use-auth";
+import {
+    useChangePasswordMutation,
+    useConfirmEmailVerificationMutation,
+    useDisableTwoFactorMutation,
+    useEnableTwoFactorMutation,
+    useMySessionsQuery,
+    useRequestEmailVerificationMutation,
+    useRevokeMySessionMutation,
+} from "@/hooks/api/use-users";
 import type { UserSession } from "@/types/security.types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { BadgeCheck, KeyRound, Laptop, Mail, Monitor, QrCode, ShieldCheck, Smartphone, Tablet } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 const passwordSchema = z
   .object({
@@ -375,21 +375,20 @@ export function TwoFactorCard() {
   );
 }
 
-export function PhoneVerificationCard() {
+export function EmailVerificationCard() {
   const userQuery = useCurrentUserQuery();
   const user = userQuery.data;
-  const verified = Boolean(user?.phoneVerifiedAt);
-  const [phone, setPhone] = useState(user?.phone ?? "");
+  const verified = Boolean(user?.emailVerifiedAt);
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [devCode, setDevCode] = useState<string | undefined>(undefined);
 
-  const request = useRequestPhoneVerificationMutation();
-  const confirm = useConfirmPhoneVerificationMutation();
+  const request = useRequestEmailVerificationMutation();
+  const confirm = useConfirmEmailVerificationMutation();
 
   const sendCode = () => {
     request.mutate(
-      { phone },
+      {},
       {
         onSuccess: (data) => {
           setSent(true);
@@ -416,7 +415,7 @@ export function PhoneVerificationCard() {
           setSent(false);
           setCode("");
           setDevCode(undefined);
-          toast.success("Phone number verified");
+          toast.success("Email address verified");
           void userQuery.refetch();
         },
         onError: (err) => {
@@ -431,10 +430,10 @@ export function PhoneVerificationCard() {
   return (
     <section className="surface-card p-7">
       <h3 className="flex items-center gap-2 text-base font-semibold">
-        <PhoneCall className="size-4 text-primary" /> Phone verification
+        <Mail className="size-4 text-primary" /> Email verification
       </h3>
       <p className="mt-1 text-xs text-muted-foreground">
-        A verified phone number strengthens account recovery and security alerts.
+        A verified email strengthens account recovery and security alerts.
       </p>
 
       {verified ? (
@@ -443,19 +442,7 @@ export function PhoneVerificationCard() {
         </p>
       ) : (
         <div className="mt-5 space-y-4">
-          <div>
-            <Label htmlFor="phone" className="text-xs font-medium text-muted-foreground">
-              Phone number
-            </Label>
-            <Input
-              id="phone"
-              type="tel"
-              className="mt-2 h-11 rounded-2xl"
-              value={phone}
-              disabled={sent}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
+          <p className="rounded-2xl bg-muted px-4 py-3 text-sm">Code will be sent to {user?.email}.</p>
           {sent && (
             <>
               {devCode && (
@@ -463,7 +450,7 @@ export function PhoneVerificationCard() {
                   Development mode: your code is <span className="font-bold">{devCode}</span>
                 </p>
               )}
-              <CodeField id="phone-code" label="6-digit code" value={code} onChange={setCode} />
+              <CodeField id="email-code" label="6-digit code" value={code} onChange={setCode} />
             </>
           )}
           <div className="flex gap-2">
@@ -473,7 +460,7 @@ export function PhoneVerificationCard() {
                 variant="outline"
                 className="rounded-2xl"
                 onClick={sendCode}
-                disabled={request.isPending || phone.trim().length < 7}
+                disabled={request.isPending}
               >
                 {request.isPending ? "Sending…" : "Send code"}
               </Button>
@@ -587,7 +574,7 @@ export function SecurityPanel() {
       </div>
       <div className="col-span-6 space-y-5">
         <TwoFactorCard />
-        <PhoneVerificationCard />
+        <EmailVerificationCard />
       </div>
     </div>
   );

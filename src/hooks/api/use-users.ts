@@ -2,13 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usersKeys } from "../../lib/api/query-keys";
 import { usersService } from "../../services/users.service";
 import { useAuthStore } from "../../stores/auth-store";
-import { useCurrentUserQuery } from "./use-auth";
 import type {
-  ChangePasswordDto,
-  RequestPhoneVerificationDto,
-  ConfirmPhoneVerificationDto,
-  TwoFactorCodeDto,
+    ChangePasswordDto,
+    ConfirmEmailVerificationDto,
+    RequestEmailVerificationDto,
+    TwoFactorCodeDto,
 } from "../../types/security.types";
+import { useCurrentUserQuery } from "./use-auth";
 
 export function useMySessionsQuery(params?: { page?: number; limit?: number }) {
   const user = useAuthStore((s) => s.user);
@@ -60,19 +60,19 @@ export function useDisableTwoFactorMutation() {
   });
 }
 
-export function useRequestPhoneVerificationMutation() {
+export function useRequestEmailVerificationMutation() {
   return useMutation({
-    mutationFn: (payload: RequestPhoneVerificationDto) =>
-      usersService.requestPhoneVerification(payload),
+    mutationFn: (payload: RequestEmailVerificationDto) =>
+      usersService.requestEmailVerification(payload),
   });
 }
 
-export function useConfirmPhoneVerificationMutation() {
+export function useConfirmEmailVerificationMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: ConfirmPhoneVerificationDto) =>
-      usersService.confirmPhoneVerification(payload),
+    mutationFn: (payload: ConfirmEmailVerificationDto) =>
+      usersService.confirmEmailVerification(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: usersKeys.me });
     },

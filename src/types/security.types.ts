@@ -18,16 +18,16 @@ export interface ChangePasswordDto {
   newPassword: string;
 }
 
-export interface RequestPhoneVerificationDto {
-  phone?: string;
+export interface RequestEmailVerificationDto {
+  email?: string;
 }
 
-export interface RequestPhoneVerificationResponse {
+export interface RequestEmailVerificationResponse {
   message: string;
   devCode?: string;
 }
 
-export interface ConfirmPhoneVerificationDto {
+export interface ConfirmEmailVerificationDto {
   code: string;
 }
 

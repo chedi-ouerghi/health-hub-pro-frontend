@@ -1,0 +1,6 @@
+name = "health-hub-pro-client"
+compatibility_date = "2026-09-05"
+pages_build_output_dir = ".output/public"
+
+[vars]
+# The API URL is injected at build time by Cloudflare Pages or GitHub Actions.

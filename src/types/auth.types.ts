@@ -13,7 +13,6 @@ export interface User {
   status: UserStatus;
   emailVerifiedAt?: string | null;
   twoFactorEnabled?: boolean;
-  phoneVerifiedAt?: string | null;
   lastLoginAt?: string | null;
   createdAt: string;
   updatedAt?: string;

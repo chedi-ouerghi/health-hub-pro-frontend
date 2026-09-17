@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
 import { useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { toast } from "sonner";
@@ -12,6 +13,7 @@ import {
 import type { Doctor } from "@/types/doctor.types";
 import { useCreateAppointmentMutation } from "@/hooks/api/use-appointments";
 import { cn } from "@/lib/utils";
+import { stripePromise } from "@/services/payments.service";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -71,57 +73,6 @@ function format12(slot: string): string {
 }
 
 // Validation functions
-const validateCardNumber = (value: string): string | null => {
-  const cleanNumber = value.replace(/[\s-]/g, "");
-  if (!cleanNumber) return "Card number is required";
-  if (!/^\d+$/.test(cleanNumber)) return "Card number must contain only digits";
-  if (cleanNumber.length < 13 || cleanNumber.length > 19) {
-    return "Card number must be between 13 and 19 digits";
-  }
-  return null;
-};
-
-const validateExpiryMonth = (value: string): string | null => {
-  if (!value) return "Month is required";
-  const month = Number(value);
-  if (isNaN(month) || month < 1 || month > 12) return "Month must be between 01 and 12";
-  return null;
-};
-
-const validateExpiryYear = (value: string): string | null => {
-  if (!value) return "Year is required";
-  const year = Number(value);
-  const currentYear = new Date().getFullYear();
-  if (isNaN(year) || year < currentYear) return "Year cannot be in the past";
-  if (year > currentYear + 20) return "Year is too far in the future";
-  return null;
-};
-
-const validateExpiryDate = (month: string, year: string): string | null => {
-  const monthError = validateExpiryMonth(month);
-  const yearError = validateExpiryYear(year);
-  if (monthError || yearError) return monthError || yearError;
-
-  const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1;
-
-  const expMonth = Number(month);
-  const expYear = Number(year);
-
-  if (expYear < currentYear || (expYear === currentYear && expMonth < currentMonth)) {
-    return "Card has expired";
-  }
-  return null;
-};
-
-const validateCVC = (value: string): string | null => {
-  if (!value) return "CVC is required";
-  if (!/^\d+$/.test(value)) return "CVC must contain only digits";
-  if (value.length < 3 || value.length > 4) return "CVC must be 3 or 4 digits";
-  return null;
-};
-
 const validateCardHolderName = (value: string): string | null => {
   if (!value.trim()) return "Card holder name is required";
   if (value.trim().length < 3) return "Name must be at least 3 characters";
@@ -130,6 +81,12 @@ const validateCardHolderName = (value: string): string | null => {
 };
 
 export function BookingPanel({ doctor }: { doctor: Doctor }) {
+  return <Elements stripe={stripePromise}><BookingPanelContent doctor={doctor} /></Elements>;
+}
+
+function BookingPanelContent({ doctor }: { doctor: Doctor }) {
+  const stripe = useStripe();
+  const elements = useElements();
   const navigate = useNavigate();
   const now = useMemo(() => new Date(), []);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -137,10 +94,6 @@ export function BookingPanel({ doctor }: { doctor: Doctor }) {
   const [selectedSlot, setSelectedSlot] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [notes, setNotes] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expMonth, setExpMonth] = useState("");
-  const [expYear, setExpYear] = useState("");
-  const [cvc, setCvc] = useState("");
   const [cardHolderName, setCardHolderName] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -204,160 +157,21 @@ export function BookingPanel({ doctor }: { doctor: Doctor }) {
     [base, selectedDay],
   );
 
-  // Live validation for each field
-  const validateField = (field: string, value: string): string | null => {
-    switch (field) {
-      case 'cardNumber':
-        return validateCardNumber(value);
-      case 'expMonth':
-        return validateExpiryMonth(value);
-      case 'expYear':
-        return validateExpiryYear(value);
-      case 'cvc':
-        return validateCVC(value);
-      case 'cardHolderName':
-        return validateCardHolderName(value);
-      default:
-        return null;
-    }
-  };
-
-  const handleFieldChange = (field: string, value: string) => {
-    // Update the field value
-    switch (field) {
-      case 'cardNumber':
-        // Format card number with spaces every 4 digits
-        const formatted = value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
-        setCardNumber(formatted.slice(0, 19)); // Limit to 19 chars (16 digits + 3 spaces)
-        break;
-      case 'expMonth':
-        // Only allow 2 digits
-        const monthValue = value.replace(/\D/g, '').slice(0, 2);
-        setExpMonth(monthValue);
-        break;
-      case 'expYear':
-        // Only allow 4 digits
-        const yearValue = value.replace(/\D/g, '').slice(0, 4);
-        setExpYear(yearValue);
-        break;
-      case 'cvc':
-        // Only allow 3-4 digits
-        const cvcValue = value.replace(/\D/g, '').slice(0, 4);
-        setCvc(cvcValue);
-        break;
-      case 'cardHolderName':
-        setCardHolderName(value);
-        break;
-    }
-
-    // Mark field as touched
-    setTouchedFields(prev => ({ ...prev, [field]: true }));
-  };
-
-  // Validate all fields and update errors
   const validateAllFields = () => {
     const errors: Record<string, string> = {};
-
-    const cardNumberError = validateCardNumber(cardNumber);
-    if (cardNumberError) errors.cardNumber = cardNumberError;
-
     const cardHolderError = validateCardHolderName(cardHolderName);
     if (cardHolderError) errors.cardHolderName = cardHolderError;
 
-    const expiryDateError = validateExpiryDate(expMonth, expYear);
-    if (expiryDateError) {
-      if (validateExpiryMonth(expMonth)) errors.expMonth = validateExpiryMonth(expMonth)!;
-      if (validateExpiryYear(expYear)) errors.expYear = validateExpiryYear(expYear)!;
-      if (!errors.expMonth && !errors.expYear) {
-        errors.expMonth = expiryDateError;
-      }
-    }
-
-    const cvcError = validateCVC(cvc);
-    if (cvcError) errors.cvc = cvcError;
-
     setFormErrors(errors);
     setTouchedFields({
-      cardNumber: true,
       cardHolderName: true,
-      expMonth: true,
-      expYear: true,
-      cvc: true,
     });
 
     return Object.keys(errors).length === 0;
   };
 
-  // Validate on blur
-  const handleFieldBlur = (field: string) => {
-    setTouchedFields(prev => ({ ...prev, [field]: true }));
 
-    let value = '';
-    switch (field) {
-      case 'cardNumber': value = cardNumber; break;
-      case 'expMonth': value = expMonth; break;
-      case 'expYear': value = expYear; break;
-      case 'cvc': value = cvc; break;
-      case 'cardHolderName': value = cardHolderName; break;
-    }
-
-    const error = validateField(field, value);
-    setFormErrors(prev => ({
-      ...prev,
-      [field]: error || '',
-    }));
-  };
-
-  // Update validation on each change
-  const updateValidation = (field: string, value: string) => {
-    if (touchedFields[field]) {
-      const error = validateField(field, value);
-      setFormErrors(prev => ({
-        ...prev,
-        [field]: error || '',
-      }));
-    }
-  };
-
-  // Wrapper for onChange to also update validation
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    const formatted = rawValue.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
-    const limited = formatted.slice(0, 19);
-    setCardNumber(limited);
-    updateValidation('cardNumber', limited);
-    setTouchedFields(prev => ({ ...prev, cardNumber: true }));
-  };
-
-  const handleExpMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 2);
-    setExpMonth(value);
-    updateValidation('expMonth', value);
-    setTouchedFields(prev => ({ ...prev, expMonth: true }));
-  };
-
-  const handleExpYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 4);
-    setExpYear(value);
-    updateValidation('expYear', value);
-    setTouchedFields(prev => ({ ...prev, expYear: true }));
-  };
-
-  const handleCvcChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 4);
-    setCvc(value);
-    updateValidation('cvc', value);
-    setTouchedFields(prev => ({ ...prev, cvc: true }));
-  };
-
-  const handleCardHolderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setCardHolderName(value);
-    updateValidation('cardHolderName', value);
-    setTouchedFields(prev => ({ ...prev, cardHolderName: true }));
-  };
-
-  const confirmBooking = () => {
+  const confirmBooking = async () => {
     if (!effectiveSlot) return;
 
     // Validate all fields
@@ -370,28 +184,38 @@ export function BookingPanel({ doctor }: { doctor: Doctor }) {
     const scheduledAt = new Date(base.getFullYear(), base.getMonth(), selectedDay, hh, mm);
     const trimmedNotes = notes.trim();
 
+    if (!stripe || !elements) {
+      toast.error("Payment form is not ready");
+      return;
+    }
     createAppointment.mutate(
       {
         doctorId: doctor.id,
         scheduledAt: scheduledAt.toISOString(),
         ...(trimmedNotes ? { notes: trimmedNotes } : {}),
-        cardNumber: cardNumber.replace(/\s/g, ''), // Remove spaces before sending
-        expMonth: Number(expMonth),
-        expYear: Number(expYear),
-        cvc,
-        ...(cardHolderName ? { cardHolderName: cardHolderName.trim() } : {}),
       },
       {
         onMutate: () => {
           setIsProcessing(true);
         },
-        onSuccess: () => {
+        onSuccess: async (appointment) => {
+          const card = elements.getElement(CardElement);
+          if (!card || !appointment.clientSecret) {
+            setIsProcessing(false);
+            toast.error("Payment could not be initialized");
+            return;
+          }
+          const result = await stripe.confirmCardPayment(appointment.clientSecret, {
+            payment_method: { card, billing_details: { name: cardHolderName.trim() } },
+          });
           setIsProcessing(false);
+          if (result.error) {
+            toast.error("Payment failed", { description: result.error.message });
+            return;
+          }
           setIsConfirmed(true);
           setConfirmOpen(false);
-          toast.success("Appointment confirmed", {
-            description: `${name} · ${dateLabel} at ${format12(effectiveSlot)}`,
-          });
+          toast.success("Payment submitted", { description: "Your appointment will be confirmed after payment verification." });
           navigate({ to: "/appointments" });
         },
         onError: (err) => {
@@ -642,8 +466,7 @@ export function BookingPanel({ doctor }: { doctor: Doctor }) {
                   aria-label="Card holder"
                   placeholder="Card holder name"
                   value={cardHolderName}
-                  onChange={handleCardHolderChange}
-                  onBlur={() => handleFieldBlur('cardHolderName')}
+                  onChange={(e) => setCardHolderName(e.target.value)}
                   className={cn(
                     "w-full rounded-xl border px-3 py-2 transition-colors",
                     getFieldError('cardHolderName')
@@ -667,120 +490,10 @@ export function BookingPanel({ doctor }: { doctor: Doctor }) {
                 )}
               </div>
 
-              <div>
-                <input
-                  aria-label="Card number"
-                  placeholder="4242 4242 4242 4242"
-                  value={cardNumber}
-                  onChange={handleCardNumberChange}
-                  onBlur={() => handleFieldBlur('cardNumber')}
-                  maxLength={19}
-                  className={cn(
-                    "w-full rounded-xl border px-3 py-2 transition-colors font-mono",
-                    getFieldError('cardNumber')
-                      ? "border-red-500 focus:border-red-500"
-                      : isFieldValid('cardNumber')
-                        ? "border-green-500"
-                        : "border-gray-300 focus:border-primary"
-                  )}
-                />
-                {getFieldError('cardNumber') && (
-                  <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
-                    <AlertCircle className="size-3" />
-                    {getFieldError('cardNumber')}
-                  </p>
-                )}
-                {isFieldValid('cardNumber') && (
-                  <p className="mt-1 flex items-center gap-1 text-xs text-green-500">
-                    <CheckCircle2 className="size-3" />
-                    Valid card number
-                  </p>
-                )}
+              <div className="rounded-xl border border-gray-300 bg-white p-3">
+                <CardElement options={{ hidePostalCode: false }} />
               </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <input
-                    aria-label="Exp month"
-                    placeholder="MM"
-                    value={expMonth}
-                    onChange={handleExpMonthChange}
-                    onBlur={() => handleFieldBlur('expMonth')}
-                    maxLength={2}
-                    className={cn(
-                      "w-full rounded-xl border px-3 py-2 transition-colors",
-                      getFieldError('expMonth') || (touchedFields['expMonth'] && touchedFields['expYear'] && !formErrors['expMonth'] && formErrors['expYear'] && validateExpiryDate(expMonth, expYear))
-                        ? "border-red-500 focus:border-red-500"
-                        : isFieldValid('expMonth')
-                          ? "border-green-500"
-                          : "border-gray-300 focus:border-primary"
-                    )}
-                  />
-                  {(getFieldError('expMonth') || (touchedFields['expMonth'] && touchedFields['expYear'] && !formErrors['expMonth'] && formErrors['expYear'] && validateExpiryDate(expMonth, expYear))) && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {getFieldError('expMonth') || validateExpiryDate(expMonth, expYear)}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <input
-                    aria-label="Exp year"
-                    placeholder="YYYY"
-                    value={expYear}
-                    onChange={handleExpYearChange}
-                    onBlur={() => handleFieldBlur('expYear')}
-                    maxLength={4}
-                    className={cn(
-                      "w-full rounded-xl border px-3 py-2 transition-colors",
-                      getFieldError('expYear') || (touchedFields['expMonth'] && touchedFields['expYear'] && !formErrors['expMonth'] && formErrors['expYear'] && validateExpiryDate(expMonth, expYear))
-                        ? "border-red-500 focus:border-red-500"
-                        : isFieldValid('expYear')
-                          ? "border-green-500"
-                          : "border-gray-300 focus:border-primary"
-                    )}
-                  />
-                  {getFieldError('expYear') && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {getFieldError('expYear')}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <input
-                    aria-label="CVC"
-                    placeholder="CVC"
-                    value={cvc}
-                    onChange={handleCvcChange}
-                    onBlur={() => handleFieldBlur('cvc')}
-                    maxLength={4}
-                    type="password"
-                    className={cn(
-                      "w-full rounded-xl border px-3 py-2 transition-colors",
-                      getFieldError('cvc')
-                        ? "border-red-500 focus:border-red-500"
-                        : isFieldValid('cvc')
-                          ? "border-green-500"
-                          : "border-gray-300 focus:border-primary"
-                    )}
-                  />
-                  {getFieldError('cvc') && (
-                    <p className="mt-1 text-xs text-red-500">
-                      {getFieldError('cvc')}
-                    </p>
-                  )}
-                  {isFieldValid('cvc') && (
-                    <p className="mt-1 text-xs text-green-500">
-                      ✓
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                This is a simulated payment for demo purposes.
-              </p>
+              <p className="text-xs text-muted-foreground">Test mode only. Card data is handled securely by Stripe.</p>
             </div>
           </div>
           <DialogFooter>
