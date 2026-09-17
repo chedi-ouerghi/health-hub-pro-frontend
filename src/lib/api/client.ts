@@ -3,8 +3,12 @@ import { useAuthStore } from "../../stores/auth-store";
 import { ApiError, type ApiResponse, type PaginatedResponse } from "../../types/api.types";
 import type { AuthResponse } from "../../types/auth.types";
 
-const API_URL =
+const configuredApiUrl =
   (import.meta.env["VITE_API_URL"] as string | undefined) || "http://localhost:5000/api/v1";
+
+const API_URL = configuredApiUrl.replace(/\/+$/, "").match(/\/api\/v1$/i)
+  ? configuredApiUrl.replace(/\/+$/, "")
+  : `${configuredApiUrl.replace(/\/+$/, "").replace(/\/api$/i, "")}/api/v1`;
 
 export const apiClient = axios.create({
   baseURL: API_URL,
