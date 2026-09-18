@@ -18,12 +18,10 @@ export default defineConfig(({ command, mode }) => {
     tailwindcss(),
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
     tanstackStart({
-      // Use src/server.ts (our SSR error wrapper) as the server entry point.
       server: { entry: "server" },
     }),
   ];
 
-  // Deploy build is emitted for Cloudflare Workers via Nitro.
   if (command === "build") {
     plugins.push(nitro({ defaultPreset: "cloudflare-module" }));
   }
@@ -44,6 +42,16 @@ export default defineConfig(({ command, mode }) => {
         "@tanstack/query-core",
       ],
     },
+    // ▼▼▼ AJOUTEZ CE BLOC ICI ▼▼▼
+    ssr: {
+      optimizeDeps: {
+        include: [
+          "@tanstack/react-start",
+          "@tanstack/start-client-core",
+        ],
+      },
+    },
+    // ▲▲▲ FIN DU BLOC ▲▲▲
     optimizeDeps: {
       include: [
         "react",
