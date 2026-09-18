@@ -10,6 +10,7 @@ import type {
   RegisterDto,
   RegisterResponse,
   ResetPasswordDto,
+  ResendVerificationDto,
   VerifyEmailDto,
 } from "../types/auth.types";
 
@@ -42,6 +43,16 @@ export const authService = {
   verifyEmail: async (payload: VerifyEmailDto): Promise<{ message: string }> => {
     const res = await apiClient.post<ApiResponse<{ message: string }>>(
       "/auth/verify-email",
+      payload,
+    );
+    return unwrap(res);
+  },
+
+  resendVerification: async (
+    payload: ResendVerificationDto,
+  ): Promise<{ message: string }> => {
+    const res = await apiClient.post<ApiResponse<{ message: string }>>(
+      "/auth/resend-verification",
       payload,
     );
     return unwrap(res);

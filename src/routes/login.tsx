@@ -5,11 +5,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { Eye, EyeOff, HeartPulse, Loader2, Lock, Mail } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { useCurrentUserQuery, useLoginMutation } from "@/hooks/api/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import logo from "@/assets/logo.png";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -82,9 +83,11 @@ function LoginPage() {
       >
         <div className="surface-card p-8 sm:p-10">
           <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-2xl gradient-teal shadow-glow">
-              <HeartPulse className="size-5 text-primary-foreground" />
-            </div>
+            <img
+              src={logo}
+              alt="MediCare logo"
+              className="size-11 rounded-2xl object-cover shadow-glow"
+            />
             <div>
               <p className="text-lg font-semibold tracking-tight">MediCare</p>
               <p className="text-xs text-muted-foreground">Sign in to your patient account</p>

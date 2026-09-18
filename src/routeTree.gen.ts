@@ -13,6 +13,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AccountRestrictedRouteImport } from './routes/account-restricted'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as VerifyEmailPendingRouteImport } from './routes/verify-email-pending'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
 import { Route as AuthenticatedAppointmentsRouteImport } from './routes/_authenticated.appointments'
@@ -44,6 +45,11 @@ const LoginRoute = LoginRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VerifyEmailPendingRoute = VerifyEmailPendingRouteImport.update({
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/account-restricted': typeof AccountRestrictedRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/verify-email-pending': typeof VerifyEmailPendingRoute
   '/appointments': typeof AuthenticatedAppointmentsRoute
   '/availabilities': typeof AuthenticatedAvailabilitiesRoute
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/account-restricted': typeof AccountRestrictedRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/verify-email-pending': typeof VerifyEmailPendingRoute
   '/appointments': typeof AuthenticatedAppointmentsRoute
   '/availabilities': typeof AuthenticatedAvailabilitiesRoute
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   '/account-restricted': typeof AccountRestrictedRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/verify-email-pending': typeof VerifyEmailPendingRoute
   '/_authenticated/appointments': typeof AuthenticatedAppointmentsRoute
   '/_authenticated/availabilities': typeof AuthenticatedAvailabilitiesRoute
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/account-restricted'
     | '/login'
     | '/register'
+    | '/verify-email'
     | '/verify-email-pending'
     | '/appointments'
     | '/availabilities'
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
     | '/account-restricted'
     | '/login'
     | '/register'
+    | '/verify-email'
     | '/verify-email-pending'
     | '/appointments'
     | '/availabilities'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/account-restricted'
     | '/login'
     | '/register'
+    | '/verify-email'
     | '/verify-email-pending'
     | '/_authenticated/appointments'
     | '/_authenticated/availabilities'
@@ -237,6 +249,7 @@ export interface RootRouteChildren {
   AccountRestrictedRoute: typeof AccountRestrictedRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
   VerifyEmailPendingRoute: typeof VerifyEmailPendingRoute
 }
 
@@ -268,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/verify-email-pending': {
@@ -403,6 +423,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRestrictedRoute: AccountRestrictedRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
   VerifyEmailPendingRoute: VerifyEmailPendingRoute,
 }
 export const routeTree = rootRouteImport

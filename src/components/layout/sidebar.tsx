@@ -1,9 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion } from "motion/react";
-import { ChevronLeft, HeartPulse, MessageSquare, Search } from "lucide-react";
+import { ChevronLeft, MessageSquare, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUserQuery } from "@/hooks/api/use-auth";
 import { itemsForRole } from "@/lib/role-utils";
+import logo from "@/assets/logo.png";
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -17,9 +18,11 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       className="sticky top-0 z-30 flex h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar"
     >
       <div className="flex h-20 items-center gap-3 px-6">
-        <div className="grid size-10 shrink-0 place-items-center rounded-2xl gradient-teal shadow-glow">
-          <HeartPulse className="size-5 text-primary-foreground" />
-        </div>
+        <img
+          src={logo}
+          alt="MediCare logo"
+          className="size-10 shrink-0 rounded-2xl object-cover shadow-glow"
+        />
         {!collapsed && (
           <motion.span
             initial={{ opacity: 0, x: -6 }}
