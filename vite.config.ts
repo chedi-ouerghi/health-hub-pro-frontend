@@ -23,7 +23,15 @@ export default defineConfig(({ command, mode }) => {
   ];
 
   if (command === "build") {
-    plugins.push(nitro({ defaultPreset: "cloudflare-module" }));
+    plugins.push(
+      nitro({
+        defaultPreset: "vercel",
+        // Workaround for Nitro/Rolldown chunk-cycle in TanStack SSR output.
+        // See https://github.com/nitrojs/nitro/issues/4533 and
+        // https://github.com/rolldown/rolldown/issues/10734
+        inlineDynamicImports: true,
+      }),
+    );
   }
 
   plugins.push(viteReact());
